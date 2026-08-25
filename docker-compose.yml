@@ -1,0 +1,31 @@
+services:
+  db:
+    image: alpine:3.20
+    container_name: pme-sqlite
+    working_dir: /data
+    volumes:
+      - sqlite_data:/data
+    command: ["sh", "-c", "apk add --no-cache sqlite && touch /data/sales.db && tail -f /dev/null"]
+    healthcheck:
+      test: ["CMD-SHELL", "sqlite3 /data/sales.db 'SELECT 1;'"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    container_name: pme-data-engineer
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_PATH: /shared/sales.db
+      PRODUCTS_SOURCE: /app/data/produits.csv
+      STORES_SOURCE: /app/data/magasins.csv
+      SALES_SOURCE: /app/data/ventes.csv
+    volumes:
+      - sqlite_data:/shared
+    command: ["python", "pipeline.py"]
+
+volumes:
+  sqlite_data:
